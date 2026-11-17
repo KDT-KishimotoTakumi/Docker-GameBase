@@ -1,0 +1,29 @@
+
+Ubuntuの作成
+
+１：mkdirでvimフォルダの作成
+mkdir vim
+
+２：作成したフォルダの移動
+cd vim
+
+３：UbuntuにVimをインストール
+sudo apt update
+sudo apt install vim -y
+
+４：Vimがインストールされたか確認する
+vim --version
+
+
+dockerfileを作成したやり方
+０：最初にフォルダ移動
+cd working
+
+１：実行コマンド
+docker build -t ubuntu-vim
+
+２：Ubuntuを起動
+docker run -it ubuntu-vim
+
+３：vim起動
+vim
