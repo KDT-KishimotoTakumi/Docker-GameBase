@@ -1,29 +1,177 @@
-
-Ubuntuの作成
-
-１：mkdirでvimフォルダの作成
-mkdir vim
-
-２：作成したフォルダの移動
-cd vim
-
-３：UbuntuにVimをインストール
-sudo apt update
-sudo apt install vim -y
-
-４：Vimがインストールされたか確認する
+==================================================
+サーバープログラム Docker 基盤作成メモ
+==================================================
+ 
+■ 0：作業フォルダへ移動（毎回最初にやる）
+cd E:\3年\３年授業内容\サーバープログラム\Docker\Projects\DockerBase
+ 
+■ 1：フォルダ構成
+DockerBase/
+├─ htdocs/
+│   └─ info.php
+├─ sql/
+├─ storage/
+├─ mysql/
+│   └─ Dockerfile
+├─ php/
+│   ├─ Dockerfile
+│   ├─ php.ini
+│   └─ php_apache2.conf
+├─ working/
+│   └─ Dockerfile
+├─ .gitignore
+└─ docker-compose.yml
+ 
+１：足りないフォルダを作る
+mkdir htdocs, sql, storage
+ 
+２：info.phpを作る
+Set-Content htdocs\info.php '<?php phpinfo();'
+ 
+■ 2：各ファイルの中身
+ 
+【working/Dockerfile】
+# Ubuntuの最新イメージを使用する
+FROM ubuntu:latest
+# パッケージ情報を更新する
+RUN apt-get update
+# vimをインストールする
+RUN apt-get install -y vim
+# コンテナ起動時にbashを使用する
+CMD ["/bin/bash"]
+ 
+【mysql/Dockerfile】
+# 使用するMySQLのイメージを指定する
+FROM mysql:8.0.36-debian
+# MySQL用の古いパッケージリストを削除し、日本語ロケールをインストールする
+RUN rm -f /etc/apt/sources.list.d/mysql.list && \
+    apt-get update && apt-get install -y locales
+# 日本語のUTF-8ロケールを有効にして生成する
+RUN sed -i 's/# ja_JP.UTF-8 UTF-8/ja_JP.UTF-8 UTF-8/' /etc/locale.gen && \
+    locale-gen
+# 使用する言語を日本語に設定する
+ENV LANG ja_JP.UTF-8
+ENV LC_ALL ja_JP.UTF-8
+# タイムゾーンを日本時間に設定する
+ENV TZ Asia/Tokyo
+ 
+【php/Dockerfile】
+配布されたものをそのまま使う
+※中で php.ini と php_apache2.conf をCOPYしているので、phpフォルダに2つとも置く
+ 
+【php/php.ini】
+date.timezone = Asia/Tokyo
+mbstring.language = Japanese
+display_errors = On
+log_errors = On
+ 
+【php/php_apache2.conf】
+ErrorLog /var/log/apache2/error.log
+CustomLog /var/log/apache2/access.log combined
+ 
+【htdocs/info.php】
+<?php
+phpinfo();
+ 
+【docker-compose.yml】
+services:
+  working:
+    build: ./working
+    volumes:
+      - ./storage:/storage
+    command: ["tail", "-f", "/dev/null"]
+  mysql:
+    build: ./mysql
+    volumes:
+      - ./sql:/root/sql
+      - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 'p@ssword'
+  php:
+    build: ./php
+    volumes:
+      - ./htdocs:/var/www/html
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - mysql
+volumes:
+    db_data: {}
+ 
+■ 3：Docker環境の起動
+１：ビルドして起動
+docker compose up -d --build
+ 
+２：起動しているか確認（3つとも Up ならOK）
+docker compose ps
+ 
+３：止めるとき
+docker compose down
+ 
+■ 4：ブラウザでinfo.phpを実行
+１：ブラウザで開く
+http://localhost/info.php
+ 
+■ 5：phpコンテナのアクセスログ・エラーログを確認
+１：ログを表示
+docker compose logs php
+ 
+２：リアルタイムで表示（Ctrl + C で終了）
+docker compose logs -f php
+ 
+３：最後の20行だけ表示
+docker compose logs --tail 20 php
+ 
+■ 6：workingコンテナへ入る
+１：workingコンテナに入る
+docker compose exec working bash
+ 
+２：Ubuntuか確認
+cat /etc/os-release
+ 
+３：vimが入っているか確認
 vim --version
-
-
-dockerfileを作成したやり方
-０：最初にフォルダ移動
-cd working
-
-１：実行コマンド
-docker build -t ubuntu-vim
-
-２：Ubuntuを起動
-docker run -it ubuntu-vim
-
-３：vim起動
-vim
+ 
+４：storageフォルダが見えるか確認
+ls /storage
+ 
+５：コンテナから抜ける
+exit
+ 
+■ 7：Gitで新規リポジトリを作成して保存
+ 
+【.gitignore】
+# working用の作業データ
+storage/
+# ログ
+*.log
+# OS・エディタ
+Thumbs.db
+.DS_Store
+.vscode/
+ 
+１：名前とメールを設定（初回だけ）
+git config --global user.name "あなたの名前"
+git config --global user.email "あなたのメールアドレス"
+ 
+２：リポジトリを作る
+git init
+ 
+３：全ファイルを追加
+git add .
+ 
+４：追加されたファイルを確認
+git status
+ 
+５：コミット（保存）
+git commit -m "Docker環境の土台を作成（working / mysql / php）"
+ 
+６：コミットされたか確認
+git log --oneline
+ 
+７：（GitHubに上げる場合）
+git branch -M main
+git remote add origin https://github.com/ユーザー名/リポジトリ名.git
+git push -u origin main
